@@ -128,10 +128,9 @@ class DataRow:
 
 
 class DMRidCSV:
-    # We use this function when the thing we want to process is only one line at a time.
-    # For cases where the data spans multiple lines, we don't do this, we use a generator further down.
+
     def parse_json_input(self):
-        # Open and read the JSON file
+        # Open and read the JSON file directly into a dict
         with open(self.args.my_file, "r") as file:
             data = json.load(file)
         return data
