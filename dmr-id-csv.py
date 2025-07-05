@@ -1,7 +1,7 @@
-#!/bin/env python3
+#!/usr/bin/env python3
 # DMR Contact CSV Generator
 # Maintainer: Jesse Rhoads
-# Thanks to https://w1aex.com/dmrid/dmrid.html for dcumenting a similar manual process!
+# Thanks to https://w1aex.com/dmrid/dmrid.html for documenting a similar manual process!
 # Many radios have a limited amount of space to process the global DMR database.
 # And some websites are charging money to customize the data set.
 # This script is a free way to shrink the data set.
@@ -31,6 +31,7 @@ prog_description = "Shrinks the DMR ID DB CSV to fit in smaller memory."
 # Set up Logging to stderr/stdout
 log = logging.getLogger()
 
+
 class DataRow:
     def __repr__(self):
         return str(
@@ -53,6 +54,10 @@ class DataRow:
             self.lname = self.name.pop()
         else:
             self.lname = self.name[1]
+        # Merge name fields into one if desired
+        if self.merge:
+            self.fname = f"{self.fname} {self.lname}"
+            self.lname = ""
         # Reduce Country name into 3 chars
         raw_country = self.country
         try:
@@ -101,21 +106,35 @@ class DataRow:
             return found
         else:
             country = raw_country[0:3].upper()
-            log.debug(f"Country {raw_country} not found, setting {country}")
+            log.debug(f"Country not found: {raw_country} setting {country}")
             return country
 
     def to_dict(self):
-        return {
-            "RADIO_ID": self.radio_id,
-            "CALLSIGN": self.callsign,
-            "FIRST_NAME": self.fname,
-            "LAST_NAME": self.lname,
-            "CITY": self.city,
-            "STATE": self.state,
-            "COUNTRY": self.country,
-        }
+        if self.shift:
+            # We can omit city and move state/country one column left to be compatible with some radios.
+            return {
+                "RADIO_ID": self.radio_id,
+                "CALLSIGN": self.callsign,
+                "FIRST_NAME": self.fname,
+                "LAST_NAME": self.lname,
+                "CITY": self.state,
+                "STATE": self.country,
+                "COUNTRY": ""
+            }
+        else:
+            return {
+                "RADIO_ID": self.radio_id,
+                "CALLSIGN": self.callsign,
+                "FIRST_NAME": self.fname,
+                "LAST_NAME": self.lname,
+                "CITY": self.city,
+                "STATE": self.state,
+                "COUNTRY": self.country,
+            }
 
-    def __init__(self, radio_id, callsign, fname, lname, city, state, country):
+    def __init__(
+        self, radio_id, callsign, fname, lname, city, state, country, merge, shift
+    ):
         # RADIOID CSV Format contains RADIO_ID,CALLSIGN,FIRST_NAME,LAST_NAME,CITY,STATE,COUNTRY.
         self.radio_id = radio_id
         self.callsign = callsign
@@ -124,6 +143,8 @@ class DataRow:
         self.city = city
         self.state = state
         self.country = country
+        self.merge = merge
+        self.shift = shift
         self.compress()
 
 
@@ -163,7 +184,17 @@ class DMRidCSV:
         for line in data:
             log.debug(f"line {line}")
             row = line.split(",")
-            my_row = DataRow(row[0], row[1], row[2].strip(), row[3].strip(), row[4], row[5], row[6])
+            my_row = DataRow(
+                row[0],
+                row[1],
+                row[2].strip(),
+                row[3].strip(),
+                row[4],
+                row[5],
+                row[6],
+                self.args.merge,
+                self.args.shift,
+            )
             log.debug(f"Made row {row}")
             self.seen_countries[my_row.country] += 1
             self.rows.append(my_row.to_dict())
@@ -196,16 +227,27 @@ class DMRidCSV:
         city = user.get("city")
         callsign = user.get("callsign")
         radio_id = user.get("radio_id")
-        row = DataRow(radio_id, callsign, fname, lname, city, state, country)
+        row = DataRow(
+            radio_id,
+            callsign,
+            fname,
+            lname,
+            city,
+            state,
+            country,
+            self.args.merge,
+            self.args.shift,
+        )
         log.debug(f"Made row {row}")
         self.seen_countries[row.country] += 1
         self.rows.append(row.to_dict())
 
     def write_csv(self):
-        # log.debug(f"Rows: {self.rows}")
         with open(self.args.csv_out, "w", newline="") as csvfile:
             fieldnames = list(self.rows[0].keys())
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer = csv.DictWriter(
+                csvfile, fieldnames=fieldnames, extrasaction="ignore"
+            )
             writer.writeheader()
             writer.writerows(self.rows)
 
@@ -226,7 +268,22 @@ def get_parameters():
         help="Enable Debug Logging",
         action="store_true",
     )
-
+    parser.add_argument(
+        "-m",
+        "--merge",
+        dest="merge",
+        default=False,
+        help="Merge FNAME and LNAME into FNAME",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-s",
+        "--shift",
+        dest="shift",
+        default=False,
+        help="Shift columns left dropping city (for RT4D and 878 style output)",
+        action="store_true",
+    )
     parser.add_argument(
         "-f",
         "--file",
@@ -284,10 +341,13 @@ def main():
 
     if cli_args.csv_out:
         dmr_csv.write_csv()
-  
+
     log.info(f"Total lines parsed: {dmr_csv.total}")
-    seen = dict(sorted(dmr_csv.seen_countries.items(), key=lambda item: item[1], reverse=True))
+    seen = dict(
+        sorted(dmr_csv.seen_countries.items(), key=lambda item: item[1], reverse=True)
+    )
     log.info(f"Entries by Country: {seen}")
+
 
 if __name__ == "__main__":
     main()
