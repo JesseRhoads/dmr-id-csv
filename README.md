@@ -29,4 +29,5 @@ To work around this, there is a manual mapping that we can add to correct any ma
 See the country_map in the fix_country method.
 
 ### Installation/Requirements
-This script requires Python 3, pycountry, and us. See requirements.txt. You can install using pip.
+This script requires Python 3, pycountry, and us. See requirements.txt. You can install the requirements using pip or other packager.
+I did not take the time to make a package for this script, use it as-is.
