@@ -15,6 +15,15 @@ https://radioid.net/static/user.csv (Standard)
 ### Usage Examples
 #### Shrink the users.json file
 python3 dmr-id-csv.py -f users.json -w smaller-users.csv -t json
+
+#### Shrink the users.json file, merging name fields and shifting one column (for some radios like the RT-4D)
+python3 dmr-id-csv.py -f users.json -w smaller-users.csv -t json -m -s
+
 #### Shrink the user.csv file
 python3 dmr-id-csv.py -f user.csv -w smaller-users.csv -t csv
 
+### Country and State Mappings
+The script will use ISO State and Country mappings to shrink the data to 2-letter state and 3-letter country.
+However, the user input in the data is unsanitized. So some countries will likely not match.
+To work around this, there is a manual mapping that we can add to correct any mappings where the first-three-letter assumption is incorrect.
+See the country_map in the fix_country method.
